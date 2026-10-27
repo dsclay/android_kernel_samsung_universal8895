@@ -2,6 +2,16 @@ name: Build greatlte kernel (schedutil)
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: "Which kernel to build"
+        required: true
+        default: schedutil-available
+        type: choice
+        options:
+          - stock
+          - schedutil-available
+          - schedutil-default
 
 jobs:
   build:
@@ -15,33 +25,54 @@ jobs:
           sudo apt-get install -y bc bison flex libssl-dev libelf-dev make ccache gcc-aarch64-linux-gnu
 
       - name: Configure Kernel
+        env:
+          VARIANT: ${{ github.event.inputs.variant }}
         run: |
-          export ARCH=arm64 O=out
-          make exynos8895-greatlte_defconfig
-          
-          # Enable schedutil and its dependencies, set it as the absolute default
-          ./scripts/config --file out/.config \
-            --enable CPU_FREQ_GOV_SCHEDUTIL \
-            --enable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL \
-            --disable CPU_FREQ_DEFAULT_GOV_INTERACTIVE \
-            --disable CPU_FREQ_DEFAULT_GOV_PERFORMANCE \
-            --disable CPU_FREQ_DEFAULT_GOV_POWERSAVE \
-            --disable CPU_FREQ_DEFAULT_GOV_USERSPACE \
-            --disable CPU_FREQ_DEFAULT_GOV_ONDEMAND \
-            --disable CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
-          
-          # Make olddefconfig is critical to trigger the 'select SCHED_TUNE' dependencies
-          make olddefconfig
+          set -e
+          echo "Building variant: $VARIANT"
+          make ARCH=arm64 O=out exynos8895-greatlte_defconfig
+          case "$VARIANT" in
+            stock)
+              ./scripts/config --file out/.config \
+                --disable CPU_FREQ_GOV_SCHEDUTIL \
+                --disable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL \
+                --disable SCHED_TUNE \
+                --enable CPU_FREQ_DEFAULT_GOV_INTERACTIVE
+              ;;
+            schedutil-available)
+              ./scripts/config --file out/.config \
+                --enable CPU_FREQ_GOV_SCHEDUTIL \
+                --enable SCHED_TUNE \
+                --disable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL \
+                --enable CPU_FREQ_DEFAULT_GOV_INTERACTIVE
+              ;;
+            schedutil-default)
+              ./scripts/config --file out/.config \
+                --enable CPU_FREQ_GOV_SCHEDUTIL \
+                --enable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL \
+                --disable CPU_FREQ_DEFAULT_GOV_INTERACTIVE \
+                --disable CPU_FREQ_DEFAULT_GOV_PERFORMANCE \
+                --disable CPU_FREQ_DEFAULT_GOV_POWERSAVE \
+                --disable CPU_FREQ_DEFAULT_GOV_USERSPACE \
+                --disable CPU_FREQ_DEFAULT_GOV_ONDEMAND \
+                --disable CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
+              ;;
+            *)
+              echo "unknown variant: $VARIANT"
+              exit 1
+              ;;
+          esac
+          make ARCH=arm64 O=out olddefconfig
+          grep -E "^CONFIG_(CPU_FREQ_GOV_SCHEDUTIL|SCHED_TUNE|CPU_FREQ_DEFAULT_GOV_[A-Z]+)=" out/.config
 
       - name: Build Kernel
         run: |
-          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-w" -j$(nproc) Image dtbs modules
+          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS="-fcommon" KCFLAGS="-w" -j$(nproc) Image dtbs
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: greatlte-schedutil-kernel
+          name: greatlte-${{ github.event.inputs.variant }}
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/dts/exynos/*.dtb
-            **/*.ko
