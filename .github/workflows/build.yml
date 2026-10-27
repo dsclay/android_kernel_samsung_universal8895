@@ -35,7 +35,7 @@ jobs:
 
       - name: Build Kernel
         run: |
-          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-w" -j$(nproc) Image dtbs modules
+          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS="-fcommon" KCFLAGS="-w" -j$(nproc) Image dtbs modules
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
