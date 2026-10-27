@@ -17,7 +17,7 @@ jobs:
       - name: Configure Kernel
         run: |
           export ARCH=arm64 O=out
-          make ARCH=arm64 O=out exynos8895-greatlte_defconfig
+          make exynos8895-greatlte_defconfig
           
           # Enable schedutil and its dependencies, set it as the absolute default
           ./scripts/config --file out/.config \
@@ -31,11 +31,11 @@ jobs:
             --disable CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
           
           # Make olddefconfig is critical to trigger the 'select SCHED_TUNE' dependencies
-          make ARCH=arm64 O=out olddefconfig
+          make olddefconfig
 
       - name: Build Kernel
         run: |
-          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS="-fcommon" KCFLAGS="-w" -j$(nproc) Image dtbs
+          make ARCH=arm64 O=out CROSS_COMPILE=aarch64-linux-gnu- KCFLAGS="-w" -j$(nproc) Image dtbs modules
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -44,3 +44,4 @@ jobs:
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/dts/exynos/*.dtb
+            **/*.ko
