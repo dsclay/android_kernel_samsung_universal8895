@@ -17,7 +17,7 @@ jobs:
       - name: Configure Kernel
         run: |
           export ARCH=arm64 O=out
-          make exynos8895-greatlte_defconfig
+          make ARCH=arm64 O=out exynos8895-greatlte_defconfig
           
           # Enable schedutil and its dependencies, set it as the absolute default
           ./scripts/config --file out/.config \
@@ -31,7 +31,7 @@ jobs:
             --disable CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
           
           # Make olddefconfig is critical to trigger the 'select SCHED_TUNE' dependencies
-          make olddefconfig
+          make ARCH=arm64 O=out olddefconfig
 
       - name: Build Kernel
         run: |
